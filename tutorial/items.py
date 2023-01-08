@@ -15,7 +15,4 @@ def remove_quotes(text):
 class QuoteItem(Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
-    quote_content  = Field(
-        input_process=MapCompose(remove_quotes),
-        output_processor=TakeFirst()
-    )
+    quote_content  = Field()

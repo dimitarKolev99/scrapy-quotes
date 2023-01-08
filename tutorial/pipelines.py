@@ -9,45 +9,47 @@ from sqlalchemy.orm import sessionmaker
 from scrapy.exceptions import DropItem
 from tutorial.models import Quote, db_connect, create_table
 import logging
+import psycopg2
 
 class SaveQuotesPipeline(object):
     def __init__(self):
-        """
-        Initializes database connection and sessionmaker
-        Creates tables
-        """
-        engine = db_connect()
-        create_table(engine)
-        self.Session = sessionmaker(bind=engine)
+        self.connection = psycopg2.connect(
+            user='ukggwjdb',
+            password='ynLyFB9yx_3CyG-mJ7iwDIJGzrrb8Kn6',
+            host='ruby.db.elephantsql.com',
+            port='',
+            database='ukggwjdb'
+        )
+        self.cur = self.connection.cursor()
 
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS quotes(
+            id serial PRIMARY KEY, 
+            quote_content text
+        )
+        """)
 
     def process_item(self, item, spider):
-        """Save quotes in the database
-        This method is called for every item pipeline component
-        """
-        session = self.Session()
-        quote = Quote()
-        quote.quote_content = item["quote_content"]
+        self.cur.execute("select * from quotes where quote_content = %s", (
+            item["quote_content"]
+        ))
+        result = self.cur.fetchone()
 
-        # # check whether the author exists
-        # exist_quote = session.query(Quote).filter_by(quote_content = quote.quote_content).first()
-        # if exist_quote is not None:  # the current author exists
-        #     quote.quote_content = exist_quote
-        # else:
-        #     quote.quote_content = quote
+        if result:
+            spider.logger.warn("Item already in database: %s" % item["quote_content"])
 
-        try:
-            session.add(quote)
-            session.commit()
-
-        except:
-            session.rollback()
-            raise
-
-        finally:
-            session.close()
+        else:
+            self.cur.execute("""  insert into quotes (quote_content) values (%s) """, (
+                item["quote_content"]
+            ))
+            self.connection.commit()
 
         return item
+
+    def close_spider(self, spider):
+
+        self.cur.close()
+        self.connection.close()
 
 class DuplicatesPipeline(object):
 
